@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.0.1/react-router-dom.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.js"></script>
+  <title>Product Averages</title>
+</head>
+<body>
+  <h1>Acme Product Averages React</h1>
+
+  <div id="root"></div>
+
+  <script type='text/babel'>
+    const average = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const API = 'https://acme-users-api-rev.herokuapp.com/api';
+    const { render } = ReactDOM;
+    const { HashRouter, Switch, Link, Route, Redirect } = ReactRouterDOM;
+    const Nav = ({path}) => {
+      console.log(path)
+      return (
+          <div id="header">
+              <nav>
+                  <Link to='/home' className={path === '/home' ? 'active' : ''}>Home</Link>
+                  <Link to='/products' className={path === '/products' ? 'active' : ''}>Products</Link>
+              </nav>
+          </div>
+      )
+    }
+
+    const Home = ({products}) => {
+      const getAverageProdPrice = () => {
+          return average(products.map(product => product.suggestedPrice)).toFixed(2);
+      }
+      return (
+        <div>
+          <h2>Home</h2>
+          <p>We have { products.length } products with an average price of { getAverageProdPrice() }</p>
+        </div>
+      );
+    }
+
+    const Products = ({products, companies, offerings}) => {
+      const getAveragePrice = (product) => {
+          return average(offerings.filter(offer => offer.productId === product.id).map(offer => offer.price)).toFixed(2);
+      };
+      const getCompany = (companyId) => companies.find(comp => comp.id === companyId).name;
+      const getMinPriceCompany = (product) => {
+        const offers = offerings.filter(offer => offer.productId === product.id);
+        return offers.reduce((arr, offer) => offer.price < arr[0] ? [offer.price, getCompany(offer.companyId)] : arr, [Infinity, '']);
+      }
+      const lis = products.map(product => (
+          <li id="productList" key={product.id}>
+              <p><span className='bold'>Product:</span>{ product.name }</p>
+              <p><span className='bold'>Suggested Price:</span>${ product.suggestedPrice.toFixed(2) }</p>
+              <p><span className='bold'>Average:</span>{ getAveragePrice(product) }</p>
+              <p><span className='bold'>Lowest Price:</span>{ getMinPriceCompany(product)[0].toFixed(2) } offered by { getMinPriceCompany(product)[1]}</p>
+          </li>
+      ));
+      return (
+        <div>
+          <h2>Products</h2>
+          <ul>{ lis }</ul>
+        </div>
+      );
+    }
+    
+
+    class App extends React.Component {
+      constructor() {
+          super()
+          this.state = {
+              products: [],
+              companies: [],
+              offerings: [],
+          }
+      }
+      componentDidMount() {
+          /* api calls */
+          Promise.all([
+              axios.get(`${API}/products`),
+              axios.get(`${API}/companies`),
+              axios.get(`${API}/offerings`)
+          ]).then(([products, companies, offerings]) => {
+              this.setState({
+                  products: products.data,
+                  companies: companies.data,
+                  offerings: offerings.data
+              });
+          })
+      }
+      render() {
+          const { products, companies, offerings } = this.state;
+          return (
+            <HashRouter>
+                <Route render={ ({location}) => <Nav path= {location.pathname}/> } />
+                <Switch>
+                    <Route path='/home' render={ () => <Home products = {products} /> } />
+                    <Route path='/products' render={ () => <Products companies = {companies} products = {products} offerings = {offerings} /> } />
+                    <Redirect to='/home' />
+                </Switch>
+            </HashRouter>
+          );
+        }
+      }
+      const root = document.querySelector('#root');
+      render(<App />, root);
+
+      /*
+      const getData = async () => {
+        let [companies, products, offerings] = await Promise.all([
+          axios.get(`${API}/companies`), 
+          axios.get(`${API}/products`), 
+          axios.get(`${API}/offerings`)
+        ]);
+
+        const average = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+
+        console.log(products.data);
+        console.log(products.data.map(prod => average(offerings.data.filter(offer => offer.productId === prod.id)
+                                                                    .map(offer => offer.price))
+                                                                    .toFixed(2)));
+
+      }
+      */
+
+    </script>
+  </body>
+</html>
